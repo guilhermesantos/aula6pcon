@@ -46,6 +46,8 @@ void ordena_colunas(int *, int, int);
 void calcula_mediana(int *, float *, int, int);
 void quicksort(int *, int, int, int);
 int partition (int *, int, int, int);
+int master();
+void slave(int my_rank);
 
 
 
@@ -144,40 +146,7 @@ void calcula_mediana(int *M, float *vet, int L, int C)
 
 int main(int argc, char **argv)
 {
-    int L, C;
-    int *M;
-    float *vet;
 
-    int i, j;
-
-    FILE *arquivo_entrada,*arquivo_saida;
-    
-    if(!(arquivo_entrada=fopen("entrada.txt","r"))) 
-    {
-      printf("Erro ao abrir entrada.txt como leitura! Saindo! \n");
-      return(-1);
-    }
-    
-    if(!(arquivo_saida=fopen("saida.txt","w+")))  
-    {
-      printf("Erro ao abrir/criar saida.txt como escrita. Saindo! \n");
-      return(-1);
-    }
-
-    // Leitura da primeira linha de entrada.txt contendo as dimensoes de M
-    fscanf(arquivo_entrada, "%d %d", &L, &C);
-    //printf("Ordem da Matriz M: L=%d C=%d\n", L, C);
-    
-    // criando M[LxC]
-    M = (int *) malloc ( L * C * sizeof(int));
-
-    // criando vet[C] do tipo float. Este vetor terá as medianas das colunas.
-    vet = (float *) malloc (C * sizeof (float) );
-  
-    // carregando M do arquivo
-    for(i=0; i<L; i++)
-      for(j=0; j<C; j++)
-	  fscanf(arquivo_entrada, "%d", &M[i*C+j]);
 /*
     // impressao para verificacao apenas
     for(i=0; i<L; i++)
@@ -200,44 +169,166 @@ int main(int argc, char **argv)
     }
 */
     //calcula_mediana(M, vet, L, C);
-  int npes; 
+
+  //Inicializa MPI
+   int i,j;
   int my_rank;
   MPI_Init(&argc, &argv);
-  MPI_Comm_size(MPI_COMM_WORLD, &npes);
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
+
+  if(my_rank == 0) {
+    //printf("processo raiz rank %d\n", my_rank);
+
+    //int fim_primeiro = C/4;
+    //int fim_segundo = C/2;
+    //int fim_terceiro = (C/4)*3;
+    //int fim_quarto = C-1;
+    
+    master();
+
+  } else {
+    //printf("processo slave rank %d\n", my_rank);
+    slave(my_rank);
+  }
+
+
+  MPI_Finalize();
   
-
-  int fim_primeiro = C/4;
-  int fim_segundo = C/2;
-  int fim_terceiro = (C/4)*3;
-  int fim_quarto = C-1;
-
-  int send_buf[2];
-  send_buf[0] = L;
-  send_buf[1] = C/4;
-
-  for(i=1; i < 4; i++) {
-    MPI_Send((void*)send_buf, 2, MPI_INT, i, 0, MPI_COMM_WORLD);
-  }
-  send_buf[1] += C%4;
-  MPI_Send((void*)send_buf, 2, MPI_INT, i, 0, MPI_COMM_WORLD);
-
-  int primeiro = 0;
-  for(i=1; i < 5; i++) {
-    MPI_Send((void*)&M[L*primeiro], 2, MPI_INT, i, 0, MPI_COMM_WORLD);
-    primeiro += C/4;
-  }
-
-    for(j=0; j<C; j++)
-        fprintf(arquivo_saida,"%.1f, ",vet[j]);
-    fprintf(arquivo_saida, "\n");
-    
-    fclose(arquivo_entrada);
-    fclose(arquivo_saida);
-
-    free(vet);
-    free(M);
-    
-    return(0);
+  return(0);
     
 } // fim da main
+
+
+int master() {  
+  int L, C;
+  int *M;
+  float *vet;
+  int i, j;
+
+  FILE *arquivo_entrada,*arquivo_saida;
+
+  if(!(arquivo_entrada=fopen("entrada.txt","r"))) 
+  {
+    printf("Erro ao abrir entrada.txt como leitura! Saindo! \n");
+    return(-1);
+  }
+
+  if(!(arquivo_saida=fopen("saida.txt","w+")))  
+  {
+    printf("Erro ao abrir/criar saida.txt como escrita. Saindo! \n");
+    return(-1);
+  }
+
+  // Leitura da primeira linha de entrada.txt contendo as dimensoes de M
+  fscanf(arquivo_entrada, "%d %d", &L, &C);
+  //printf("Ordem da Matriz M: L=%d C=%d\n", L, C);
+
+  // criando M[LxC]
+  M = (int *) malloc ( L * C * sizeof(int));
+
+  // criando vet[C] do tipo float. Este vetor terá as medianas das colunas.
+  vet = (float *) malloc (C * sizeof (float) );
+
+  // carregando M do arquivo
+  for(i=0; i<L; i++) {
+    for(j=0; j<C; j++) {
+     fscanf(arquivo_entrada, "%d", &M[j*L+i]);
+      //fscanf(arquivo_entrada, "%d", &M[i*C+j]);
+    }
+  }
+
+  /*for(i=0; i<L*C; i++) {
+    printf("matriz[%d]=%d\n", i, M3[i]);
+  }*/
+
+  int npes; 
+  MPI_Comm_size(MPI_COMM_WORLD, &npes);
+
+  int send_buf[2];
+
+
+  send_buf[0] = L;
+  send_buf[1] = C/4;
+  //printf("master: num linhas %d num colunas %d\n", send_buf[0], send_buf[1]);
+
+  for(i=1; i < 3; i++) {//manda linha e coluna pra todos os slaves-1
+      MPI_Send((void*)send_buf, 2, MPI_INT, i, 0, MPI_COMM_WORLD);
+  }
+  send_buf[1] += C%4;
+  printf("ultimo slave %d vai receber %d\n", i, send_buf[1]);
+  MPI_Send((void*)send_buf, 2, MPI_INT, i, 0, MPI_COMM_WORLD);//manda pro ultimo slave todas as colunas que sobraram
+
+  int primeiro = C/4;
+  for(i=1; i < 4; i++) {
+    MPI_Send((void*)&M[L*primeiro], L*C/4, MPI_INT, i, 0, MPI_COMM_WORLD);
+    primeiro += C/4;
+  }
+  printf("submeteu pedaco pra todos os slaves\n");
+  
+  //As primeiras C/4 colunas sao feitas pelo processo master
+  ordena_colunas(M, L, C/4);
+  calcula_mediana(M, vet, L, C/4);
+
+  //Recebe os resultados dos outros processos e junta no vetor de medianas
+  for(i=1; i<4; i++) {
+    MPI_Recv((void*)&vet[i], 1, MPI_FLOAT, i, MPI_ANY_TAG, MPI_COMM_WORLD, NULL);
+    //printf("recebeu mediana %.1lf\n", vet[i]);
+  }
+  //Escreve no arquivo de saida
+    for(j=0; j<C; j++) 
+      fprintf(arquivo_saida,"%.1f, ",vet[j]);
+  fprintf(arquivo_saida, "\n");
+
+  fclose(arquivo_entrada);
+  fclose(arquivo_saida);
+
+  free(vet);
+  free(M);
+  return 0;
+    
+}
+
+void slave(int my_rank) {
+  printf("executando slave %d\n", my_rank);
+  int source, linhas, colunas;
+  MPI_Status status;
+  int *rec_buff;
+  float *medianas;
+  int *matriz;
+  
+  rec_buff = (int*)malloc(sizeof(int)*2);
+  MPI_Recv((void*)rec_buff, 2, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);//recebe numero de linhas e colunas
+  printf("slave %d recebeu %d linhas e %d colunas\n", my_rank, rec_buff[0], rec_buff[1]);
+
+  source = status.MPI_SOURCE;
+  linhas = rec_buff[0];
+  colunas = rec_buff[1];
+  free(rec_buff);
+
+  //printf("worker %d recebeu %d linhas e %d colunas do source %d\n", my_rank, linhas, colunas, source);
+
+  printf("slave %d vai receber sua parte da matriz\n", my_rank);
+  rec_buff = malloc(sizeof(int)*linhas*colunas);
+  MPI_Recv((void*)rec_buff, linhas*colunas, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+  printf("slave %d recebeu sua parte da matriz\n", my_rank);
+
+  matriz = rec_buff;
+  int i;
+
+
+  ordena_colunas(rec_buff, linhas, colunas);
+  medianas = (float*)malloc(sizeof(float)*colunas);
+  calcula_mediana(rec_buff, medianas, linhas, colunas);
+  
+  for(i=0; i < colunas; i++) {
+    printf("mediana %d do slave %d: %.1lf\n", i, my_rank, medianas[i]);
+  }
+
+  printf("slave %d vai mandar de volta pro master\n", my_rank);
+  MPI_Send((void*)medianas, colunas, MPI_FLOAT, source, 0, MPI_COMM_WORLD);
+  printf("slave %d terminou de executar\n", my_rank);
+
+  free(medianas);
+  free(rec_buff);
+}
