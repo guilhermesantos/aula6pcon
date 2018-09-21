@@ -234,7 +234,6 @@ int master() {
   for(i=0; i<L; i++) {
     for(j=0; j<C; j++) {
      fscanf(arquivo_entrada, "%d", &M[j*L+i]);
-      //fscanf(arquivo_entrada, "%d", &M[i*C+j]);
     }
   }
 
@@ -256,7 +255,7 @@ int master() {
       MPI_Send((void*)send_buf, 2, MPI_INT, i, 0, MPI_COMM_WORLD);
   }
   send_buf[1] += C%4;
-  printf("ultimo slave %d vai receber %d\n", i, send_buf[1]);
+  //printf("ultimo slave %d vai receber %d\n", i, send_buf[1]);
   MPI_Send((void*)send_buf, 2, MPI_INT, i, 0, MPI_COMM_WORLD);//manda pro ultimo slave todas as colunas que sobraram
 
   int primeiro = C/4;
@@ -264,7 +263,7 @@ int master() {
     MPI_Send((void*)&M[L*primeiro], L*C/4, MPI_INT, i, 0, MPI_COMM_WORLD);
     primeiro += C/4;
   }
-  printf("submeteu pedaco pra todos os slaves\n");
+  //printf("submeteu pedaco pra todos os slaves\n");
   
   //As primeiras C/4 colunas sao feitas pelo processo master
   ordena_colunas(M, L, C/4);
@@ -290,7 +289,7 @@ int master() {
 }
 
 void slave(int my_rank) {
-  printf("executando slave %d\n", my_rank);
+  //printf("executando slave %d\n", my_rank);
   int source, linhas, colunas;
   MPI_Status status;
   int *rec_buff;
@@ -299,7 +298,7 @@ void slave(int my_rank) {
   
   rec_buff = (int*)malloc(sizeof(int)*2);
   MPI_Recv((void*)rec_buff, 2, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);//recebe numero de linhas e colunas
-  printf("slave %d recebeu %d linhas e %d colunas\n", my_rank, rec_buff[0], rec_buff[1]);
+  //printf("slave %d recebeu %d linhas e %d colunas\n", my_rank, rec_buff[0], rec_buff[1]);
 
   source = status.MPI_SOURCE;
   linhas = rec_buff[0];
@@ -308,10 +307,10 @@ void slave(int my_rank) {
 
   //printf("worker %d recebeu %d linhas e %d colunas do source %d\n", my_rank, linhas, colunas, source);
 
-  printf("slave %d vai receber sua parte da matriz\n", my_rank);
+  //printf("slave %d vai receber sua parte da matriz\n", my_rank);
   rec_buff = malloc(sizeof(int)*linhas*colunas);
   MPI_Recv((void*)rec_buff, linhas*colunas, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-  printf("slave %d recebeu sua parte da matriz\n", my_rank);
+  //printf("slave %d recebeu sua parte da matriz\n", my_rank);
 
   matriz = rec_buff;
   int i;
@@ -321,13 +320,13 @@ void slave(int my_rank) {
   medianas = (float*)malloc(sizeof(float)*colunas);
   calcula_mediana(rec_buff, medianas, linhas, colunas);
   
-  for(i=0; i < colunas; i++) {
+  /*for(i=0; i < colunas; i++) {
     printf("mediana %d do slave %d: %.1lf\n", i, my_rank, medianas[i]);
-  }
+  }*/
 
-  printf("slave %d vai mandar de volta pro master\n", my_rank);
+  //printf("slave %d vai mandar de volta pro master\n", my_rank);
   MPI_Send((void*)medianas, colunas, MPI_FLOAT, source, 0, MPI_COMM_WORLD);
-  printf("slave %d terminou de executar\n", my_rank);
+  //printf("slave %d terminou de executar\n", my_rank);
 
   free(medianas);
   free(rec_buff);
